@@ -1,58 +1,24 @@
-use std::{
-    net::{TcpListener, TcpStream},
-    io::{prelude::*, BufReader},
-};
+use std::net::UdpSocket;
 
-const END_MESSAGE: &str = "\r\n\r\n";
-
+// #[tokio::main]
 fn main() {
-    let listener = TcpListener::bind("0.0.0.0:8000").unwrap();
+    dotenv::dotenv().ok();
 
-    for stream_result in listener.incoming() {
-        match stream_result {
-            Ok(stream) => {
-                handle_stream(&stream); 
-                println!("Successfully handled stream");
-            },
-            Err(e) => eprintln!("Error in request: {}", e)
+    // let listener = TcpListener::bind().unwrap();
+    let sock = UdpSocket::bind(format!("0.0.0.0:{}", std::env::var("PORT").unwrap())).unwrap();
+    println!(
+        "opened udp socket at port: {:?}",
+        std::env::var("PORT").unwrap()
+    );
+    let mut buf = [0; 1024];
+
+    loop {
+        let (len, addr) = sock.recv_from(&mut buf).unwrap();
+        println!("Recieved message of length: {}, from: {}", len, addr);
+        println!("Message: {:?}", buf);
+        match sock.send_to(&buf[..len], addr) {
+            Ok(v) => println!("num_bytes_sent: {}", v),
+            Err(e) => eprintln!("Error in sending thru socket: {}", e),
         }
     }
-}
-
-fn handle_stream(stream: &TcpStream) {
-    // print the request
-    let body = recieve_request(&stream);
-
-    println!("Recieved this body: {}", body);
-
-    // send http success
-    send_success(&stream);
-}
-
-fn send_success(
-    mut stream: &TcpStream,
-) {
-    // turn the response to a string
-    let mut response_string = String::from("connection success");
-    response_string.push_str(END_MESSAGE);
-
-    // send the response
-    stream.write_all(response_string.as_bytes()).unwrap();
-}
-
-fn recieve_request(stream: &TcpStream) -> String {
-    // create the buffer reader
-    let mut buf_reader = BufReader::new(stream);
-
-    // create the string the body goes into
-    let mut body = String::new();
-
-    // read the contents into the string
-    while let Ok(bytes_read) = buf_reader.read_line(&mut body) {
-        // once read end character then break
-        if bytes_read == 0 || body.ends_with(END_MESSAGE) {
-            break;
-        }
-    }
-    body
 }

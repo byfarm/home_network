@@ -1,31 +1,31 @@
-use std::io::prelude::*;
-use std::io::BufReader;
-
-use std::net::TcpStream;
-
-const END_MESSAGE: &str = "\r\n\r\n";
+use std::net::{SocketAddr, UdpSocket};
 
 pub fn run_server() -> Result<(), std::io::Error> {
     loop {
-        if let Ok(mut stream) = TcpStream::connect(std::env!("SERVER")) {
-            let mut message = String::from("Hello from esp");
-            message.push_str(END_MESSAGE);
+        let destination = format!("{}:{}", std::env!("SERVER"), std::env!("PORT"));
 
-            stream.write_all(message.as_bytes()).unwrap();
+        // let mut buf = [0; 1024];
+        let message = "Hello via udp!";
 
-            let mut response = String::new();
+        let addr: SocketAddr = destination.parse().unwrap();
+        let local_addr = "0.0.0.0:8004";
+        log::warn!("Remote Address: {}", addr);
+        log::warn!("Local Address: {}", local_addr);
 
-            let mut buf_reader = BufReader::new(&stream);
+        match UdpSocket::bind(local_addr) {
+            Ok(sock) => {
+                log::info!("successfully bound to {}", &local_addr);
+                loop {
+                    match sock.send_to(message.as_bytes(), addr) {
+                        Ok(len) => log::info!("{:?} bytes sent to {}", len, addr),
+                        Err(e) => log::error!("Error in sending message to address: {}", e),
+                    };
 
-            while let Ok(bytes_read) = buf_reader.read_line(&mut response) {
-                if bytes_read == 0 || response.ends_with(END_MESSAGE) {
-                    break;
+                    std::thread::sleep(std::time::Duration::from_secs(2));
                 }
             }
-        } else {
-            log::error!("Unable to connect to server!")
+            Err(e) => log::error!("Unable to connect to server due to: {}", e),
         }
-
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        std::thread::sleep(std::time::Duration::from_secs(2));
     }
 }

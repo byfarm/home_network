@@ -1,3 +1,7 @@
+use load_dotenv;
+
+load_dotenv::load_dotenv!("../.env");
+
 fn main() {
     esp_idf_svc::sys::link_patches();
 
