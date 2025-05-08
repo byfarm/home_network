@@ -3,12 +3,6 @@
 version = 4
 
 [[package]]
-name = "dotenv"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
-
-[[package]]
 name = "interface"
 version = "0.1.0"
 dependencies = [
@@ -31,14 +25,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1885c039570dc00dcb4ff087a89e185fd56bae234ddc7f056a945bf36467248d"
 dependencies = [
  "proc-macro2",
-]
-
-[[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "dotenv",
- "interface",
 ]
 
 [[package]]

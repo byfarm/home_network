@@ -27,6 +27,7 @@ log = "0.4"
 esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
 heapless = "0.8.0"
 load-dotenv = "0.1.2"
+interface = {path = "../interface/"}
 
 [build-dependencies]
 embuild = "0.33"

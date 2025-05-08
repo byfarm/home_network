@@ -1,31 +1,47 @@
-use std::net::{SocketAddr, UdpSocket};
+use std::{
+    net::{SocketAddr, UdpSocket},
+    thread, time,
+};
+use interface::{NetworkPacket, UdpAble};
+
+const LOOP_DELAY_TIME: u64 = 2;
 
 pub fn run_server() -> Result<(), std::io::Error> {
-    loop {
-        let destination = format!("{}:{}", std::env!("SERVER"), std::env!("PORT"));
+    // let mut buf = [0; 1024];
 
-        // let mut buf = [0; 1024];
-        let message = "Hello via udp!";
+    // set addresses
+    let destination = format!("{}:{}", std::env!("SERVER"), std::env!("PORT"));
+    let remote_addr: SocketAddr = destination.parse().unwrap();
+    let local_addr = "0.0.0.0:8004";
 
-        let addr: SocketAddr = destination.parse().unwrap();
-        let local_addr = "0.0.0.0:8004";
-        log::warn!("Remote Address: {}", addr);
-        log::warn!("Local Address: {}", local_addr);
+    log::info!("Binding to Local Address: {}", local_addr);
+    log::info!("Connecting to Remote Address: {}", remote_addr);
 
-        match UdpSocket::bind(local_addr) {
-            Ok(sock) => {
-                log::info!("successfully bound to {}", &local_addr);
-                loop {
-                    match sock.send_to(message.as_bytes(), addr) {
-                        Ok(len) => log::info!("{:?} bytes sent to {}", len, addr),
-                        Err(e) => log::error!("Error in sending message to address: {}", e),
-                    };
+    match UdpSocket::bind(local_addr) {
+        Ok(sock) => {
+            log::info!("successfully bound to {}", &local_addr);
+            loop {
 
-                    std::thread::sleep(std::time::Duration::from_secs(2));
-                }
+                let data = &[43, 23];
+                // sock.send_to(data, remote_addr).unwrap();
+                handle_loop(&sock, remote_addr);
+                thread::sleep(time::Duration::from_secs(LOOP_DELAY_TIME));
             }
-            Err(e) => log::error!("Unable to connect to server due to: {}", e),
         }
-        std::thread::sleep(std::time::Duration::from_secs(2));
+        Err(e) => log::error!("Unable to connect to server due to: {}", e),
     }
+    Ok(())
+}
+
+fn handle_loop(sock: &UdpSocket, remote_addr: SocketAddr) {
+    let data = NetworkPacket {
+        units: "C".to_string(),
+        data: vec![32, 43, 54, 66],
+        location: "kitchen".to_string(),
+        ..Default::default()
+    };
+    match sock.send_to(&data.to_bytes().unwrap(), remote_addr) {
+        Ok(len) => log::info!("{:?} bytes sent to {}", len, remote_addr),
+        Err(e) => log::error!("Error in sending message to address: {}", e),
+    };
 }
