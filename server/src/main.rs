@@ -66,8 +66,8 @@ async fn handle_data(
         })
         .await
     {
-        Ok(v) => {
-            println!("uploaded data to database! rows affected: {}", v);
+        Ok(rows) => {
+            println!("Uploaded data to database! Rows affected: {}", rows);
             Ok(())
         }
         Err(e) => {
