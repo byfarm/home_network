@@ -21,8 +21,6 @@ pub fn run_server() -> Result<(), std::io::Error> {
         Ok(sock) => {
             log::info!("successfully bound to {}", &local_addr);
             loop {
-
-                let data = &[43, 23];
                 // sock.send_to(data, remote_addr).unwrap();
                 handle_loop(&sock, remote_addr);
                 thread::sleep(time::Duration::from_secs(LOOP_DELAY_TIME));
@@ -36,7 +34,7 @@ pub fn run_server() -> Result<(), std::io::Error> {
 fn handle_loop(sock: &UdpSocket, remote_addr: SocketAddr) {
     let data = NetworkPacket {
         units: "C".to_string(),
-        data: vec![32, 43, 54, 66],
+        data: vec![32., 43., 54., 66.],
         location: "kitchen".to_string(),
         ..Default::default()
     };
