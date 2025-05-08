@@ -6,12 +6,12 @@ pub enum ConverterError {
     BytesConvertError(String),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct NetworkPacket {
     pub version: String,
     pub units: String,
     pub location: String,
-    pub data: Vec<u8>,
+    pub data: Vec<f32>,
 }
 
 pub trait UdpAble {
@@ -20,7 +20,7 @@ pub trait UdpAble {
     fn from_bytes(bytes: &[u8]) -> Result<Self::Item, ConverterError>;
 }
 
-const V0BYTELEN: usize = 1024;
+const BUFFER_SIZE: usize = 1024;
 
 impl Default for NetworkPacket {
     fn default() -> Self {
@@ -62,7 +62,7 @@ impl UdpAble for NetworkPacket {
     fn to_bytes(self) -> Result<Vec<u8>, ConverterError> {
         match self.version.as_str() {
             "0.0" => {
-                let mut bytes = vec![0u8; 1024];
+                let mut bytes = vec![0u8; BUFFER_SIZE];
                 let mut version_iter = self.version.bytes();
                 // encode version in first two bytes
                 bytes[0] = version_iter.next().unwrap();
@@ -75,7 +75,7 @@ impl UdpAble for NetworkPacket {
                 // write the location in
                 write_into_buffer(&mut bytes, self.location.as_bytes(), 12, Some(52));
 
-                write_into_buffer(&mut bytes, self.location.as_bytes(), 64, None);
+                write_into_buffer(&mut bytes, f32_vec_to_u8_vec(&self.data), 64, None);
 
                 return Ok(bytes);
             }
@@ -95,7 +95,7 @@ impl UdpAble for NetworkPacket {
                 let version = format!("{}.{}", major, minor);
                 let units = String::from_utf8(bytes[2..12].to_vec()).unwrap();
                 let location = String::from_utf8(bytes[12..64].to_vec()).unwrap();
-                let data = Vec::from(&bytes[64..]);
+                let data = u8_to_f32_vec(&bytes[64..]);
                 return Ok(Self::Item {
                     version,
                     units,
@@ -112,11 +112,46 @@ impl UdpAble for NetworkPacket {
         };
     }
 }
+fn u8_to_f32_vec(v: &[u8]) -> Vec<f32> {
+    v.chunks_exact(4)
+        .map(TryInto::try_into)
+        .map(Result::unwrap)
+        .map(f32::from_le_bytes)
+        .collect()
+}
+
+fn f32_vec_to_u8_vec(v: &[f32]) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4) }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn create_thing(data: &Vec<f32>) -> NetworkPacket {
+        let np = NetworkPacket {
+            data: data.clone(),
+            ..Default::default()
+        };
+        np
+    }
+
     #[test]
-    fn it_works() {}
+    fn test_to_bytes() {
+        let data = vec![3., 4.];
+        let np = create_thing(&data);
+        let bytes = np.to_bytes().unwrap();
+        // println!("{:?}", bytes);
+        // println!("{:?}", &bytes[64..66]);
+        assert_eq!(vec![0, 0, 64, 64, 0, 0, 128, 64], &bytes[64..64+8]);
+    }
+
+    #[test]
+    fn test_from_bytes() {
+        let data = vec![3., 4.];
+        let np = create_thing(&data);
+        let bytes = np.to_bytes().unwrap();
+        let parsed = NetworkPacket::from_bytes(&bytes).unwrap();
+        assert_eq!(data, &parsed.data[0..2])
+    }
 }
