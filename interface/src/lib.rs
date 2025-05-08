@@ -93,8 +93,14 @@ impl UdpAble for NetworkPacket {
         match (major, minor) {
             ('0', '0') => {
                 let version = format!("{}.{}", major, minor);
-                let units = String::from_utf8(bytes[2..12].to_vec()).unwrap();
-                let location = String::from_utf8(bytes[12..64].to_vec()).unwrap();
+                let units = String::from_utf8(bytes[2..12].to_vec())
+                    .unwrap()
+                    .trim_end_matches('\0')
+                    .to_string();
+                let location = String::from_utf8(bytes[12..64].to_vec())
+                    .unwrap()
+                    .trim_end_matches('\0')
+                    .to_string();
                 let data = u8_to_f32_vec(&bytes[64..]);
                 return Ok(Self::Item {
                     version,
@@ -143,7 +149,7 @@ mod tests {
         let bytes = np.to_bytes().unwrap();
         // println!("{:?}", bytes);
         // println!("{:?}", &bytes[64..66]);
-        assert_eq!(vec![0, 0, 64, 64, 0, 0, 128, 64], &bytes[64..64+8]);
+        assert_eq!(vec![0, 0, 64, 64, 0, 0, 128, 64], &bytes[64..64 + 8]);
     }
 
     #[test]
