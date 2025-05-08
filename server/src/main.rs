@@ -26,18 +26,16 @@ async fn main() -> Result<(), std::io::Error> {
         println!("Recieved message of length: {}, from: {}", len, addr);
         let recieved_data = NetworkPacket::from_bytes(&buf).unwrap();
 
-        handle_data(pool.clone(), &recieved_data).await.unwrap();
+        handle_data(pool.clone(), recieved_data).await.unwrap();
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
 
-async fn handle_data(pool: Box<Pool>, packet: &NetworkPacket) -> Result<(), std::io::Error> {
-    let temperature = *packet.data.first().unwrap();
-
+async fn handle_data(pool: Box<Pool>, packet: NetworkPacket) -> Result<(), std::io::Error> {
     pool.conn(move |conn| {
         conn.execute(
-            "INSERT INTO kitchen (temperature) VALUES (?1)",
-            (temperature,),
+            "INSERT INTO location (location, temperature) VALUES (?1, ?2)",
+            (packet.location.clone(), *packet.data.first().unwrap()),
         )
     })
     .await
