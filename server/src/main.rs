@@ -27,15 +27,29 @@ async fn main() -> Result<(), std::io::Error> {
         let recieved_data = NetworkPacket::from_bytes(&buf).unwrap();
 
         handle_data(pool.clone(), recieved_data).await.unwrap();
-        std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
 
 async fn handle_data(pool: Box<Pool>, packet: NetworkPacket) -> Result<(), std::io::Error> {
     pool.conn(move |conn| {
         conn.execute(
-            "INSERT INTO location (location, temperature) VALUES (?1, ?2)",
-            (packet.location.clone(), *packet.data.first().unwrap()),
+            "INSERT INTO
+                data (location_id, value, measurand, units)
+            SELECT
+                location.id,
+                ?2,
+                ?3,
+                ?4
+            FROM location
+            WHERE
+                location.name = ?1
+            LIMIT 1",
+            (
+                packet.location,
+                *packet.data.first().unwrap(),
+                "temperature",
+                packet.units,
+            ),
         )
     })
     .await
