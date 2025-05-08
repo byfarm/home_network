@@ -20,7 +20,7 @@ pub trait UdpAble {
     fn from_bytes(bytes: &[u8]) -> Result<Self::Item, ConverterError>;
 }
 
-const BUFFER_SIZE: usize = 1024;
+pub const BUFFER_SIZE: usize = 1024;
 
 impl Default for NetworkPacket {
     fn default() -> Self {

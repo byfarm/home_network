@@ -1,21 +1,47 @@
-use interface::{NetworkPacket, UdpAble};
-use std::net::UdpSocket;
-// use tokio::net::UdpSocket;
+use async_sqlite::{JournalMode, Pool, PoolBuilder};
+use interface::{BUFFER_SIZE, NetworkPacket, UdpAble};
+use tokio::net::UdpSocket;
 
-// #[tokio::main]
-fn main() -> Result<(), std::io::Error> {
+#[tokio::main]
+async fn main() -> Result<(), std::io::Error> {
     dotenv::dotenv().ok();
     let port = std::env::var("PORT").expect("Need to set PORT env variable.");
 
-    let sock = UdpSocket::bind(format!("0.0.0.0:{}", port))?;
+    let sock = UdpSocket::bind(format!("0.0.0.0:{}", port)).await?;
     println!("opened udp socket at port: {:?}", port);
 
-    let mut buf = [0; 1024];
+    let mut buf = [0; BUFFER_SIZE];
+
+    let pool = Box::new(
+        PoolBuilder::new()
+            .path("db.sqlite3")
+            .journal_mode(JournalMode::Wal)
+            .open()
+            .await
+            .unwrap(),
+    );
 
     loop {
-        let (len, addr) = sock.recv_from(&mut buf)?;
+        let (len, addr) = sock.recv_from(&mut buf).await?;
         println!("Recieved message of length: {}, from: {}", len, addr);
-        let recieved_data = NetworkPacket::from_bytes(&buf);
-        println!("{:?}", recieved_data);
+        let recieved_data = NetworkPacket::from_bytes(&buf).unwrap();
+
+        handle_data(pool.clone(), &recieved_data).await.unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
+}
+
+async fn handle_data(pool: Box<Pool>, packet: &NetworkPacket) -> Result<(), std::io::Error> {
+    let temperature = *packet.data.first().unwrap();
+
+    pool.conn(move |conn| {
+        conn.execute(
+            "INSERT INTO kitchen (temperature) VALUES (?1)",
+            (temperature,),
+        )
+    })
+    .await
+    .unwrap();
+
+    Ok(())
 }

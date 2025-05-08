@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+async-sqlite = "0.5.1"
 dotenv = "0.15.0"
 interface = {path="../interface/"}
+tokio = {version = "1.45.0", features=["net", "macros", "rt", "rt-multi-thread"]}
