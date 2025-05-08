@@ -6,4 +6,4 @@ home_network_clients/target
 home_network_clients/Cargo.lock
 .env
 .embuild/
-db.sqlite3
+db.sqlite3*
