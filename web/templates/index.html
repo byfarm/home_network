@@ -2,21 +2,42 @@
 {% block content %}
     <div class="flex justify-center">
         <div class="flex-col">
-            {% for i in 0..3 %}
-                <div class="card bg-secondary-400 w-full shadow-sm">
-                    <figure>
-                        <img src="https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp"
-                             alt="Shoes" />
-                    </figure>
-                    <div class="card-body">
-                        <h2 class="card-title">Card Title</h2>
-                        <p>A card component has a figure, a body part, and inside body there are title and actions parts</p>
-                        <div class="card-actions justify-end">
-                            <button class="btn btn-primary">Buy Now</button>
-                        </div>
+            <div class="card bg-primary-100 w-full shadow-sm border border-base-content">
+                <figure>
+                    <img />
+                </figure>
+                <div class="card-body">
+                    <h2 class="card-title">Kitchen Temperature [°F]</h2>
+                    <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
+                        <table class="table">
+                            <!-- head -->
+                            <thead>
+                                <tr>
+                                    <th>Mean</th>
+                                    <th>Min</th>
+                                    <th>Max</th>
+                                    <th>Stdev</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>4</td>
+                                    <td>5</td>
+                                    <td>6</td>
+                                    <td>1</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            {% endfor %}
+            </div>
         </div>
     </div>
+    <script src="static/js/timeseries.js"
+            data-xMin="0"
+            data-xMax="100"
+            data-yMin="0"
+            data-yMax="100"
+            data-targetReplaceTag="img"
+            type="text/javascript"></script>
 {% endblock content %}

@@ -1,4 +1,5 @@
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, post, web};
+use actix_files::Files;
+use actix_web::{App, HttpResponse, HttpServer, Responder, get};
 use askama::Template;
 
 #[derive(Template)]
@@ -17,8 +18,17 @@ async fn index() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| App::new().service(index))
-        .bind(("0.0.0.0", 8000))?
-        .run()
-        .await
+    HttpServer::new(|| {
+        App::new()
+            .service(
+                Files::new("/static", "./static")
+                    .prefer_utf8(true)
+                    .show_files_listing()
+                    .use_last_modified(true),
+            )
+            .service(index)
+    })
+    .bind(("0.0.0.0", 8000))?
+    .run()
+    .await
 }
