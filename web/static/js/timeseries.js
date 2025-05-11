@@ -1,16 +1,14 @@
-import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
-
 const dataset = document.currentScript.dataset;
 
-const data = [
-    { date: new Date("2023-02-15"), value: 45 },
-    { date: new Date("2023-04-10"), value: 62 },
-    { date: new Date("2023-06-25"), value: 58 },
-    { date: new Date("2023-08-01"), value: 75 },
-    { date: new Date("2023-10-18"), value: 88 },
-    { date: new Date("2023-12-05"), value: 95 }
-];
-dataset.data = data;
+const parseDateTime = d3.timeParse("%Y-%m-%d %H:%M:%S");
+
+var data = []
+window.chartData.x.forEach((element, i) => {
+    data.push({
+        date: parseDateTime(element),
+        value: window.chartData.y[i]
+    });
+});
 
 // Declare the chart dimensions and margins.
 const width = 640;
@@ -22,12 +20,12 @@ const marginLeft = 40;
 
 // Declare the x (horizontal position) scale.
 const x = d3.scaleUtc()
-    .domain([dataset.xMin, dataset.xMax])
+    .domain(d3.extent(data, d => d.date))
     .range([marginLeft, width - marginRight]);
 
 // Declare the y (vertical position) scale.
 const y = d3.scaleLinear()
-    .domain([dataset.yMin, dataset.yMax])
+    .domain(d3.extent(data, d => d.value))
     .range([height - marginBottom, marginTop]);
 
 // Create the SVG container.
@@ -50,14 +48,17 @@ const line = d3.line()
     .y(d => y(d.value)); // Use the y scale for value
 
 svg.append("path") // Append a path element for the line
-    .datum(dataset.data) // Bind the *entire* data array to the path
+    .datum(data) // Bind the *entire* data array to the path
     .attr("fill", "none") // No fill for the line
     .attr("stroke", "green") // Set line color
     .attr("stroke-width", 1.5) // Set line thickness
-    .attr("d", line); // Generate the 'd' attribute using the line generator
+    .attr("d", d => { // Add logging here to see the generated path data string
+        const pathData = line(d);
+        console.log("Generated path data (d attribute):", pathData);
+        return pathData;
+    });
 
-// insert into the dom
-const targetTag = document.querySelector(dataset.targetReplaceTag)
+const targetTag = document.querySelector(dataset.target_replace_tag)
 if (targetTag) {
     targetTag.replaceWith(svg.node())
 } else {

@@ -4,7 +4,7 @@
         <div class="flex-col">
             <div class="card bg-primary-100 w-full shadow-sm border border-base-content">
                 <figure>
-                    <img />
+                    <img id="chart-here" />
                 </figure>
                 <div class="card-body">
                     <h2 class="card-title">Kitchen Temperature [°F]</h2>
@@ -21,10 +21,10 @@
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td>4</td>
-                                    <td>5</td>
-                                    <td>6</td>
-                                    <td>1</td>
+                                    <td>{{ mean }}</td>
+                                    <td>{{ min }}</td>
+                                    <td>{{ max }}</td>
+                                    <td>{{ stdev }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -33,11 +33,14 @@
             </div>
         </div>
     </div>
+{% endblock content %}
+{% block js %}
+    <script>window.chartData = {{ chart_data | safe }};</script>
     <script src="static/js/timeseries.js"
             data-xMin="0"
             data-xMax="100"
             data-yMin="0"
             data-yMax="100"
-            data-targetReplaceTag="img"
+            data-target_replace_tag="#chart-here"
             type="text/javascript"></script>
-{% endblock content %}
+{% endblock js %}

@@ -8,6 +8,7 @@ set dotenv-path := "/home/byron/Documents/projects/home_network/.env"
 alias b := build
 alias r := run
 alias c := check
+alias t := test
 
 default: 
     @just --choose
@@ -20,3 +21,6 @@ run PROJ:
 
 check PROJ:
     cd {{PROJ}} && cargo check
+
+test PROJ:
+    cd {{PROJ}} && cargo test
