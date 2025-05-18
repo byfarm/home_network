@@ -3,12 +3,17 @@ const dataset = document.currentScript.dataset;
 const parseDateTime = d3.timeParse("%Y-%m-%d %H:%M:%S");
 
 var data = []
-window.chartData.x.forEach((element, i) => {
+function appendToData(x, y) {
     data.push({
-        date: parseDateTime(element),
-        value: window.chartData.y[i]
+        date: parseDateTime(x),
+        value: y
     });
+}
+
+window.chartData.x.forEach((element, i) => {
+    appendToData(element, window.chartData.y[i]);
 });
+
 
 // Declare the chart dimensions and margins.
 const width = 640;

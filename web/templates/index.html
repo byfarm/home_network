@@ -21,10 +21,12 @@
                             </thead>
                             <tbody>
                                 <tr>
+                                    {#
                                     <td>{{ mean }}</td>
                                     <td>{{ min }}</td>
                                     <td>{{ max }}</td>
                                     <td>{{ stdev }}</td>
+                                    #}
                                 </tr>
                             </tbody>
                         </table>
@@ -43,4 +45,24 @@
             data-yMax="100"
             data-target_replace_tag="#chart-here"
             type="text/javascript"></script>
+    <script>
+        var socket = null;
+        function connect() {
+            disconnect();
+            const { location } = window;
+            const wsUri = `ws://${location.host}/ws`;
+            socket = new WebSocket(wsUri);
+            socket.onmessage = (ev) => {
+                console.log(ev)
+            };
+        }
+        function disconnect() {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        }
+
+        connect();
+    </script>
 {% endblock js %}
