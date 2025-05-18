@@ -53,7 +53,21 @@
             const wsUri = `ws://${location.host}/ws`;
             socket = new WebSocket(wsUri);
             socket.onmessage = (ev) => {
-                console.log(ev)
+                var wsData = JSON.parse(ev.data);
+                console.log(wsData);
+                console.log(data);
+                appendToData(wsData.date, wsData.value);
+                //data.shift();
+                console.log(data);
+
+                x.domain(d3.extent(data, d => d.date));
+                y.domain(d3.extent(data, d => d.value));
+
+                xAxis.transition().duration(1).call(d3.axisBottom(x));
+                yAxis.transition().duration(1).call(d3.axisLeft(y));
+
+                path.datum(data);
+                path.transition().attr("d", line);
             };
         }
         function disconnect() {

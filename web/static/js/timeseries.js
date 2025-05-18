@@ -39,12 +39,12 @@ const svg = d3.create("svg")
     .attr("height", height);
 
 // Add the x-axis.
-svg.append("g")
+const xAxis = svg.append("g")
     .attr("transform", `translate(0,${height - marginBottom})`)
     .call(d3.axisBottom(x));
 
 // Add the y-axis.
-svg.append("g")
+const yAxis = svg.append("g")
     .attr("transform", `translate(${marginLeft},0)`)
     .call(d3.axisLeft(y));
 
@@ -52,7 +52,7 @@ const line = d3.line()
     .x(d => x(d.date)) // Use the x scale for date
     .y(d => y(d.value)); // Use the y scale for value
 
-svg.append("path") // Append a path element for the line
+const path = svg.append("path") // Append a path element for the line
     .datum(data) // Bind the *entire* data array to the path
     .attr("fill", "none") // No fill for the line
     .attr("stroke", "green") // Set line color
@@ -63,9 +63,12 @@ svg.append("path") // Append a path element for the line
         return pathData;
     });
 
-const targetTag = document.querySelector(dataset.target_replace_tag)
-if (targetTag) {
-    targetTag.replaceWith(svg.node())
-} else {
-    console.error("Could not find image element.");
+function insertGraph() {
+    const targetTag = document.querySelector(dataset.target_replace_tag)
+    if (targetTag) {
+        targetTag.replaceWith(svg.node())
+    } else {
+        console.error("Could not find image element.");
+    }
 }
+insertGraph()

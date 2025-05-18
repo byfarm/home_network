@@ -4,11 +4,13 @@ use async_sqlite::{JournalMode, Pool, PoolBuilder, rusqlite::Connection};
 use axum::{
     Router,
     extract::State,
+    extract::ws::{WebSocket, WebSocketUpgrade},
     response::{Html, IntoResponse},
-    routing,
+    routing::get,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tokio::time::{Duration, sleep};
 
 #[allow(dead_code)]
 #[derive(Template)]
@@ -45,7 +47,7 @@ struct AppState {
 }
 
 fn get_data(conn: &Connection) -> async_sqlite::rusqlite::Result<(Vec<String>, Vec<f32>)> {
-    let mut stmt = conn.prepare("SELECT timestamp, value FROM data")?;
+    let mut stmt = conn.prepare("SELECT timestamp, value FROM data WHERE timestamp > CURRENT_TIMESTAMP;")?;
     let mut rows = stmt.query([])?;
     let mut timestamps: Vec<String> = Vec::new();
     let mut values: Vec<f32> = Vec::new();
@@ -89,6 +91,40 @@ async fn index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     HtmlTemplate(body)
 }
 
+#[derive(Deserialize, Serialize)]
+struct WsUpdate<TM, T> {
+    date: TM,
+    value: T,
+}
+
+async fn update(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    ws.on_upgrade(|ws| handle_update(ws, state))
+}
+
+async fn handle_update(mut socket: WebSocket, state: Arc<AppState>) {
+    let mut counter = 23;
+    loop {
+        let time: String = state
+            .pool
+            .conn(|conn| conn.query_row("SELECT CURRENT_TIMESTAMP;", [], |row| row.get(0)))
+            .await
+            .unwrap();
+        let wire_data = WsUpdate {
+            value: counter,
+            date: time,
+        };
+        socket
+            .send(serde_json::to_string(&wire_data).unwrap().into())
+            .await
+            .unwrap();
+        counter += 1;
+        if counter > 35 {
+            counter = 0
+        }
+        sleep(Duration::from_secs(1)).await;
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let pool = PoolBuilder::new()
@@ -101,7 +137,8 @@ async fn main() {
     let static_files = tower_http::services::ServeDir::new("./static");
 
     let app = Router::new()
-        .route("/", routing::get(index))
+        .route("/", get(index))
+        .route("/ws", get(update))
         .with_state(Arc::new(AppState { pool }))
         .nest_service("/static", static_files);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
