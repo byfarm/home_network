@@ -10,8 +10,8 @@ alias r := run
 alias c := check
 alias t := test
 
-default: 
-    @just --choose
+size PROJ:
+    cd {{PROJ}} && cargo size --release
 
 build PROJ:
     cd {{PROJ}} && cargo build
