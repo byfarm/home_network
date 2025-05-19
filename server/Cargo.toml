@@ -7,4 +7,4 @@ edition = "2024"
 async-sqlite = "0.5.1"
 dotenv = "0.15.0"
 interface = {path="../interface/"}
-tokio = {version = "1.45.0", features=["net", "macros", "rt", "rt-multi-thread"]}
+tokio = {version = "1.45.0", features=["full"]}

@@ -9,12 +9,10 @@ pub enum ConverterError {
 #[derive(Debug, PartialEq)]
 pub struct NetworkPacket {
     pub version: String,
-    pub units: String,
-    pub location: String,
     pub data: Vec<f32>,
 }
 
-pub trait UdpAble {
+pub trait Sendable {
     type Item;
     fn to_bytes(self) -> Result<Vec<u8>, ConverterError>;
     fn from_bytes(bytes: &[u8]) -> Result<Self::Item, ConverterError>;
@@ -26,8 +24,6 @@ impl Default for NetworkPacket {
     fn default() -> Self {
         Self {
             version: "0.0".to_string(),
-            units: "".to_string(),
-            location: "".to_string(),
             data: vec![],
         }
     }
@@ -56,7 +52,7 @@ fn write_into_buffer<'a>(
     bytes
 }
 
-impl UdpAble for NetworkPacket {
+impl Sendable for NetworkPacket {
     type Item = Self;
 
     fn to_bytes(self) -> Result<Vec<u8>, ConverterError> {
@@ -68,12 +64,6 @@ impl UdpAble for NetworkPacket {
                 bytes[0] = version_iter.next().unwrap();
                 version_iter.next();
                 bytes[1] = version_iter.next().unwrap();
-
-                // allow the next 10 bytes for units
-                write_into_buffer(&mut bytes, self.units.as_bytes(), 2, Some(10));
-
-                // write the location in
-                write_into_buffer(&mut bytes, self.location.as_bytes(), 12, Some(52));
 
                 write_into_buffer(&mut bytes, f32_vec_to_u8_vec(&self.data), 64, None);
 
@@ -93,19 +83,9 @@ impl UdpAble for NetworkPacket {
         match (major, minor) {
             ('0', '0') => {
                 let version = format!("{}.{}", major, minor);
-                let units = String::from_utf8(bytes[2..12].to_vec())
-                    .unwrap()
-                    .trim_end_matches('\0')
-                    .to_string();
-                let location = String::from_utf8(bytes[12..64].to_vec())
-                    .unwrap()
-                    .trim_end_matches('\0')
-                    .to_string();
                 let data = u8_to_f32_vec(&bytes[64..]);
                 return Ok(Self::Item {
                     version,
-                    units,
-                    location,
                     data,
                 });
             }
@@ -128,6 +108,77 @@ fn u8_to_f32_vec(v: &[u8]) -> Vec<f32> {
 
 fn f32_vec_to_u8_vec(v: &[f32]) -> &[u8] {
     unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4) }
+}
+
+#[derive(Debug)]
+pub struct InitializationPacket {
+    pub version: String,
+    pub location: String,
+    pub units: Vec<String>,
+    pub data_map: Vec<String>,
+}
+
+impl Sendable for InitializationPacket {
+    type Item = InitializationPacket;
+    fn to_bytes(self) -> Result<Vec<u8>, ConverterError> {
+        let mut formatable_data_map = String::new();
+        self.data_map.iter().enumerate().for_each(|(i, v)| {
+            formatable_data_map.push_str(v);
+            if i < self.data_map.len() - 1 {
+                formatable_data_map.push_str(",")
+            }
+        });
+
+        let mut formatable_untis = String::new();
+        self.units.iter().enumerate().for_each(|(i, v)| {
+            formatable_untis.push_str(v);
+            if i < self.data_map.len() - 1 {
+                formatable_untis.push_str(",")
+            }
+        });
+
+        let sendable_str = format!(
+            "{};{};{};{}",
+            self.version, self.location, formatable_data_map, formatable_untis
+        );
+        Ok(sendable_str.as_bytes().to_vec())
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Result<Self::Item, ConverterError> {
+        let parts = std::str::from_utf8(bytes).unwrap().to_string();
+        let mut parts = parts.split(';');
+
+        let version = parts.next().unwrap().to_string();
+        match version.as_str() {
+            "0.0" => {
+                let location = parts.next().unwrap().to_string();
+                let data_map = parts
+                    .next()
+                    .unwrap()
+                    .split(',')
+                    .map(|v| v.to_string())
+                    .collect();
+
+                let units = parts
+                    .next()
+                    .unwrap()
+                    .split(',')
+                    .map(|v| v.to_string())
+                    .collect();
+
+                Ok(Self::Item {
+                    version,
+                    location,
+                    data_map,
+                    units,
+                })
+            }
+            _ => Err(ConverterError::BytesConvertError(format!(
+                "Version does not exist: {}",
+                version
+            ))),
+        }
+    }
 }
 
 #[cfg(test)]
