@@ -14,7 +14,7 @@ async fn main() -> Result<(), std::io::Error> {
 
     let pool = PoolBuilder::new()
         .path("db.sqlite3")
-        .journal_mode(JournalMode::Wal)
+        .journal_mode(JournalMode::Delete)
         .open()
         .await
         .expect("Unable to open new database pool.");

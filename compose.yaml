@@ -1,0 +1,13 @@
+volumes:
+  grafana-storage:
+
+services:
+  grafana:
+    image: grafana/grafana-oss
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./server/db.sqlite3:/usr/share/db.sqlite3

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS location (
 CREATE TABLE IF NOT EXISTS data (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     location_id INTEGER NOT NULL,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    timestamp TIMESTAMP DEFAULT (strftime('%s', 'now')) NOT NULL,
     value FLOAT,
     measurand TEXT,
     units TEXT,
