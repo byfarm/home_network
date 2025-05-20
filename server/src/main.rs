@@ -1,14 +1,18 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 
 use async_sqlite::{JournalMode, Pool, PoolBuilder};
 use interface::{BUFFER_SIZE, InitializationPacket, NetworkPacket, Sendable};
 use tokio::{
-    io::{AsyncReadExt as _, BufReader},
+    io::{AsyncBufReadExt as _, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream, UdpSocket},
     sync::Mutex,
 };
 
-type AddressLookup = Arc<Mutex<HashMap<SocketAddr, InitializationPacket>>>;
+type AddressLookup = Arc<Mutex<HashMap<IpAddr, InitializationPacket>>>;
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -17,6 +21,7 @@ async fn main() -> Result<(), std::io::Error> {
     let tcp_port = std::env::var("TCP_PORT").expect("Need to set TCP_PORT env variable.");
 
     let tcp_listener = TcpListener::bind(format!("0.0.0.0:{}", tcp_port)).await?;
+    println!("opened tcp listener at port: {:?}", tcp_port);
 
     let udp_sock = UdpSocket::bind(format!("0.0.0.0:{}", udp_port)).await?;
     println!("opened udp socket at port: {:?}", udp_port);
@@ -35,31 +40,36 @@ async fn main() -> Result<(), std::io::Error> {
     );
 
     loop {
-        // accept incoming config requests
-        let (stream, socket_address) = tcp_listener.accept().await?;
+        tokio::select! {
+            tcp_result = tcp_listener.accept() => {
+                // accept incoming config requests
+                let (stream, socket_address) = tcp_result?;
 
-        let lookup_clone = address_lookup.clone();
+                let lookup_clone = address_lookup.clone();
 
-        // initialize the new connection
-        tokio::spawn(
-            async move { handle_initialization(socket_address, stream, lookup_clone).await },
-        );
+                // initialize the new connection
+                tokio::spawn(
+                    async move { handle_initialization(socket_address, stream, lookup_clone).await },
+                );
+            },
+            udp_result = udp_sock.recv_from(&mut udp_buf) => {
+                // accept new udp packets
+                let (len, addr) = udp_result?;
+                println!("Recieved message of length: {}, from: {}", len, addr);
 
-        // accept new udp packets
-        let (len, addr) = udp_sock.recv_from(&mut udp_buf).await?;
-        println!("Recieved message of length: {}, from: {}", len, addr);
+                let pool_clone = pool.clone();
+                let lookup_clone = address_lookup.clone();
 
-        let recieved_data = NetworkPacket::from_bytes(&udp_buf)
-            .expect("Unable to decode bytes into a readable state.");
+                let recieved_data = NetworkPacket::from_bytes(&udp_buf)
+                    .expect("Unable to decode bytes into a readable state.");
 
-        let pool_clone = pool.clone();
-        let lookup_clone = address_lookup.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = handle_data(&addr, pool_clone, recieved_data, lookup_clone).await {
-                eprintln!("Could not handle data from {}: {}", addr, e);
-            };
-        });
+                tokio::spawn(async move {
+                    if let Err(e) = handle_data(&addr, pool_clone, recieved_data, lookup_clone).await {
+                        eprintln!("Could not handle data from {}: {}", addr, e);
+                    };
+                });
+            }
+        }
     }
 }
 
@@ -68,20 +78,30 @@ async fn handle_initialization(
     stream: TcpStream,
     address_lookup: AddressLookup,
 ) -> std::io::Result<()> {
+    println!("recieving message from {}", socket_addr);
     let mut address_lookup = address_lookup.lock().await;
 
-    if address_lookup.contains_key(&socket_addr) {
+    if address_lookup.contains_key(&socket_addr.ip()) {
         println!("{:?} already exists in config!", socket_addr)
     }
 
     let mut tcp_buf = String::new();
     let mut buf_reader = BufReader::new(stream);
 
-    buf_reader.read_to_string(&mut tcp_buf).await?;
+    // buf_reader.read_to_string(&mut tcp_buf).await?;
+    while let Ok(bytes_read) = buf_reader.read_line(&mut tcp_buf).await {
+        if bytes_read == 0 || tcp_buf.ends_with("\n") {
+            break;
+        }
+    }
+    println!("message recieved: {}", tcp_buf);
     // not the most efficient but works
     let init_packet = InitializationPacket::from_bytes(tcp_buf.as_bytes()).unwrap();
 
-    address_lookup.insert(socket_addr, init_packet);
+    address_lookup.insert(socket_addr.ip(), init_packet);
+    println!("inserted new config");
+
+    buf_reader.write_all("200".as_bytes()).await?;
 
     Ok(())
 }
@@ -92,12 +112,37 @@ async fn handle_data(
     packet: NetworkPacket,
     address_lookup: AddressLookup,
 ) -> Result<(), async_sqlite::Error> {
-    let address_lookup = address_lookup.lock().await;
-    match address_lookup.get(socket_addr) {
-        Some(v) => {
+    let init_packet_option = {
+        let address_lookup_guard = address_lookup.lock().await;
+        address_lookup_guard.get(&socket_addr.ip()).cloned()
+    };
+
+    if let Some(metadata) = init_packet_option {
+        println!("recieved metadata: {:?}", metadata);
+        // Clone the location *once* outside the loop to be the "base" for cloning
+        let base_location = metadata.location.to_lowercase(); // metadata.location is moved here
+
+        // Iterate over `packet.data` (owned), `metadata.units` (references),
+        // and `metadata.measurands` (references).
+        // Using `.zip()` repeatedly.
+        for ((unit_ref, measureand_ref), value) in metadata
+            .units
+            .iter()
+            .zip(metadata.measureands.iter())
+            .zip(packet.data.into_iter())
+        {
+            // Clone the specific data needed for *this closure's parameters*
+            // This is the point where the `String`s are truly prepared for the query.
+            let location_param = base_location.clone(); // Clone for this specific query
+            let unit_param = unit_ref.clone(); // Clone the `&String` to an owned `String`
+            let measureand = measureand_ref.clone();
+
             match pool
                 .conn(move |conn| {
-                    conn.execute(
+                    // All variables captured by this `move` closure are now owned by it.
+                    // `location_param`, `value`, `measurand_param`, `unit_param`
+                    // are now independent copies, owned by this particular closure invocation.
+                    let mut stmt = conn.prepare_cached(
                         "INSERT INTO
                             data (location_id, value, measurand, units)
                         SELECT
@@ -109,26 +154,36 @@ async fn handle_data(
                         WHERE
                             location.name = ?1
                         LIMIT 1",
-                        async_sqlite::rusqlite::params![
-                            "kitchen",
-                            *packet.data.first().unwrap(),
-                            "temperature",
-                            v.units.first().unwrap(),
-                        ],
-                    )
+                    )?;
+
+                    println!(
+                        "Uploaded data to database! Rows affected: {}, {}, {}",
+                        value, unit_param, measureand
+                    );
+
+                    stmt.execute(async_sqlite::rusqlite::params![
+                        location_param, // Now owned by the params! call
+                        value,          // Copy (f64)
+                        measureand,
+                        unit_param, // Now owned by the params! call
+                    ])
                 })
                 .await
             {
                 Ok(rows) => {
-                    println!("Uploaded data to database! Rows affected: {}", rows);
-                    Ok(())
+                    if rows != 1 {
+                        eprintln!("Warning: {} rows affected", rows)
+                    }
                 }
-                Err(e) => Err(e),
+                Err(e) => {
+                    eprintln!("Error uploading data to database: {:?}", e);
+                    return Err(e);
+                }
             }
         }
-        None => {
-            eprintln!("{} not found in hashmap!", socket_addr);
-            Ok(())
-        }
+        Ok(())
+    } else {
+        eprintln!("{} not found in hashmap!", socket_addr);
+        Ok(())
     }
 }

@@ -8,20 +8,23 @@ use std::{
 const LOOP_DELAY_TIME: u64 = 2;
 
 pub fn run_server() -> Result<(), std::io::Error> {
-    // let mut buf = [0; 1024];
-
     // set addresses
     let remote_server = std::env!("SERVER");
-    let remote_port = std::env!("PORT");
-    let destination = format!("{}:{}", remote_server, remote_port);
+    let udp_port = std::env!("UDP_PORT");
+    let tcp_port = std::env!("TCP_PORT");
+    let tcp_destination = format!("{}:{}", remote_server, tcp_port);
+    let udp_destination = format!("{}:{}", remote_server, udp_port);
+    let local_addr = "0.0.0.0:8004";
 
-    if let Err(e) = initalize_connection(&destination) {
-        log::error!("Encountered Error initializing connection! {}", e);
-        panic!()
+    match initalize_connection(&tcp_destination) {
+        Err(e) => {
+            log::error!("Encountered Error initializing connection! {}", e);
+            panic!()
+        }
+        Ok(_) => log::info!("successfuly connected"),
     }
 
-    let remote_addr: SocketAddr = destination.parse().unwrap();
-    let local_addr = "0.0.0.0:8004";
+    let remote_addr: SocketAddr = udp_destination.parse().unwrap();
 
     log::info!("Binding to Local Address: {}", local_addr);
     log::info!("Connecting to Remote Address: {}", remote_addr);
@@ -40,23 +43,22 @@ pub fn run_server() -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn initalize_connection<'a>(destination: &'a str) -> std::io::Result<()> {
+fn initalize_connection<'a>(destination: &'a str) -> std::io::Result<String> {
     log::info!("Initializing connection with {}", destination);
     let mut stream = TcpStream::connect(&destination)?;
     let contents = InitializationPacket {
         version: "0.0".to_string(),
         location: "kitchen".to_string(),
         data_map: vec!["temperature".to_string(), "humidity".to_string()],
-        units: vec!["C".to_string(), "".to_string()],
+        measureands: vec!["temperature".to_string(), "humidity".to_string()],
+        units: vec!["C".to_string(), "C".to_string()],
     };
     stream.write_all(&contents.to_bytes().unwrap())?;
     let mut buf = String::new();
     let mut buf_reader = BufReader::new(stream);
 
     buf_reader.read_to_string(&mut buf)?;
-    assert_eq!("200", buf);
-    log::info!("Successfully connected to {}", destination);
-    Ok(())
+    Ok(buf)
 }
 
 fn handle_loop(sock: &UdpSocket, remote_addr: SocketAddr) {

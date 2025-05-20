@@ -84,10 +84,7 @@ impl Sendable for NetworkPacket {
             ('0', '0') => {
                 let version = format!("{}.{}", major, minor);
                 let data = u8_to_f32_vec(&bytes[64..]);
-                return Ok(Self::Item {
-                    version,
-                    data,
-                });
+                return Ok(Self::Item { version, data });
             }
             _ => {
                 return Err(ConverterError::BytesConvertError(format!(
@@ -110,36 +107,40 @@ fn f32_vec_to_u8_vec(v: &[f32]) -> &[u8] {
     unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4) }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InitializationPacket {
     pub version: String,
     pub location: String,
     pub units: Vec<String>,
+    pub measureands: Vec<String>,
     pub data_map: Vec<String>,
+}
+
+fn metadata_to_str(data: Vec<String>) -> String {
+    let mut result_str = String::new();
+    data.iter().enumerate().for_each(|(i, v)| {
+        result_str.push_str(v);
+        if i < data.len() - 1 {
+            result_str.push_str(",")
+        }
+    });
+    result_str
 }
 
 impl Sendable for InitializationPacket {
     type Item = InitializationPacket;
     fn to_bytes(self) -> Result<Vec<u8>, ConverterError> {
-        let mut formatable_data_map = String::new();
-        self.data_map.iter().enumerate().for_each(|(i, v)| {
-            formatable_data_map.push_str(v);
-            if i < self.data_map.len() - 1 {
-                formatable_data_map.push_str(",")
-            }
-        });
-
-        let mut formatable_untis = String::new();
-        self.units.iter().enumerate().for_each(|(i, v)| {
-            formatable_untis.push_str(v);
-            if i < self.data_map.len() - 1 {
-                formatable_untis.push_str(",")
-            }
-        });
+        let formatable_data_map = metadata_to_str(self.data_map);
+        let formatable_measureands = metadata_to_str(self.measureands);
+        let formatable_units = metadata_to_str(self.units);
 
         let sendable_str = format!(
-            "{};{};{};{}",
-            self.version, self.location, formatable_data_map, formatable_untis
+            "{};{};{};{};{}\n",
+            self.version,
+            self.location,
+            formatable_data_map,
+            formatable_units,
+            formatable_measureands
         );
         Ok(sendable_str.as_bytes().to_vec())
     }
@@ -166,11 +167,19 @@ impl Sendable for InitializationPacket {
                     .map(|v| v.to_string())
                     .collect();
 
+                let measureands = parts
+                    .next()
+                    .unwrap()
+                    .split(',')
+                    .map(|v| v.trim_end().to_string())
+                    .collect();
+
                 Ok(Self::Item {
                     version,
                     location,
                     data_map,
                     units,
+                    measureands,
                 })
             }
             _ => Err(ConverterError::BytesConvertError(format!(
