@@ -6,6 +6,7 @@ use std::{
 
 use async_sqlite::{JournalMode, Pool, PoolBuilder};
 use interface::{BUFFER_SIZE, InitializationPacket, NetworkPacket, Sendable};
+use thiserror::Error;
 use tokio::{
     io::{AsyncBufReadExt as _, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream, UdpSocket},
@@ -13,6 +14,18 @@ use tokio::{
 };
 
 type AddressLookup = Arc<Mutex<HashMap<IpAddr, InitializationPacket>>>;
+
+#[derive(Error, Debug)]
+enum ConfigError {
+    #[error("Client not properly Configured in server: {0}")]
+    NotConfigured(String),
+}
+
+enum SentDataResult<T, E, ER> {
+    Ok(T),
+    Err(E),
+    CfgErr(ER),
+}
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -64,9 +77,11 @@ async fn main() -> Result<(), std::io::Error> {
                     .expect("Unable to decode bytes into a readable state.");
 
                 tokio::spawn(async move {
-                    if let Err(e) = handle_data(&addr, pool_clone, recieved_data, lookup_clone).await {
-                        eprintln!("Could not handle data from {}: {}", addr, e);
-                    };
+                    match handle_data(&addr, pool_clone, recieved_data, lookup_clone).await {
+                        SentDataResult::Ok(_) => {},
+                        SentDataResult::Err(e) => {eprintln!("unable to recieve data due to {}", e)}
+                        SentDataResult::CfgErr(e) => {eprintln!("Client not properly configured {}", e); }
+                    }
                 });
             }
         }
@@ -81,12 +96,14 @@ async fn handle_initialization(
     println!("recieving message from {}", socket_addr);
     let mut address_lookup = address_lookup.lock().await;
 
-    if address_lookup.contains_key(&socket_addr.ip()) {
-        println!("{:?} already exists in config!", socket_addr)
-    }
-
     let mut tcp_buf = String::new();
     let mut buf_reader = BufReader::new(stream);
+
+    if address_lookup.contains_key(&socket_addr.ip()) {
+        println!("{:?} already exists in config!", socket_addr);
+        buf_reader.write_all("200".as_bytes()).await?;
+        return Ok(());
+    }
 
     // buf_reader.read_to_string(&mut tcp_buf).await?;
     while let Ok(bytes_read) = buf_reader.read_line(&mut tcp_buf).await {
@@ -112,7 +129,7 @@ async fn handle_data(
     pool: std::sync::Arc<Pool>,
     packet: NetworkPacket,
     address_lookup: AddressLookup,
-) -> Result<(), async_sqlite::Error> {
+) -> SentDataResult<(), async_sqlite::Error, ConfigError> {
     let init_packet_option = {
         let address_lookup_guard = address_lookup.lock().await;
         address_lookup_guard.get(&socket_addr.ip()).cloned()
@@ -177,13 +194,13 @@ async fn handle_data(
                 }
                 Err(e) => {
                     eprintln!("Error uploading data to database: {:?}", e);
-                    return Err(e);
+                    return SentDataResult::Err(e);
                 }
             }
         }
-        Ok(())
+        SentDataResult::Ok(())
     } else {
         eprintln!("{} not found in hashmap!", socket_addr);
-        Ok(())
+        return SentDataResult::CfgErr(ConfigError::NotConfigured(socket_addr.to_string()));
     }
 }

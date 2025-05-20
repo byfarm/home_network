@@ -13,14 +13,14 @@ alias t := test
 size PROJ:
     cd {{PROJ}} && cargo size --release
 
-build PROJ:
-    cd {{PROJ}} && cargo build
+build PROJ *ARGS:
+    cd {{PROJ}} && cargo build {{ARGS}}
 
-run PROJ:
-    cd {{PROJ}} && cargo run
+run PROJ *ARGS:
+    cd {{PROJ}} && cargo run {{ARGS}}
 
-check PROJ:
-    cd {{PROJ}} && cargo check
+check PROJ *ARGS:
+    cd {{PROJ}} && cargo check {{ARGS}}
 
-test PROJ:
-    cd {{PROJ}} && cargo test
+test PROJ *ARGS:
+    cd {{PROJ}} && cargo test {{ARGS}}

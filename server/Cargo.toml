@@ -7,4 +7,5 @@ edition = "2024"
 async-sqlite = "0.5.1"
 dotenv = "0.15.0"
 interface = {path="../interface/"}
+thiserror = "2.0.12"
 tokio = {version = "1.45.0", features=["full"]}

@@ -356,6 +356,7 @@ dependencies = [
  "async-sqlite",
  "dotenv",
  "interface",
+ "thiserror",
  "tokio",
 ]
 
