@@ -51,7 +51,7 @@ fn initalize_connection<'a>(destination: &'a str) -> std::io::Result<String> {
         location: "kitchen".to_string(),
         data_map: vec!["temperature".to_string(), "humidity".to_string()],
         measureands: vec!["temperature".to_string(), "humidity".to_string()],
-        units: vec!["C".to_string(), "C".to_string()],
+        units: vec!["C".to_string(), "".to_string()],
     };
     stream.write_all(&contents.to_bytes().unwrap())?;
     let mut buf = String::new();

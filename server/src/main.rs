@@ -98,8 +98,9 @@ async fn handle_initialization(
     // not the most efficient but works
     let init_packet = InitializationPacket::from_bytes(tcp_buf.as_bytes()).unwrap();
 
+    println!("recieved metadata: {:?}", init_packet);
+
     address_lookup.insert(socket_addr.ip(), init_packet);
-    println!("inserted new config");
 
     buf_reader.write_all("200".as_bytes()).await?;
 
@@ -118,7 +119,6 @@ async fn handle_data(
     };
 
     if let Some(metadata) = init_packet_option {
-        println!("recieved metadata: {:?}", metadata);
         // Clone the location *once* outside the loop to be the "base" for cloning
         let base_location = metadata.location.to_lowercase(); // metadata.location is moved here
 
